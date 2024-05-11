@@ -32,6 +32,13 @@ async function run() {
     await client.connect();
     // Send a ping to confirm a successful connection
 
+    // app.get("/update", (req, res) => {
+    //   const uid = req.query.uid;
+    //   const count = 0;
+    //   console.log(uid);
+    //   restaurent.updateMany({}, [{ $set: { uid: uid, count: count } }]);
+    // });
+
     app.get("/foods/search", async (req, res) => {
       const query = req.query.q;
       try {
