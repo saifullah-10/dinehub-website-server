@@ -38,7 +38,17 @@ async function run() {
     //   console.log(uid);
     //   restaurent.updateMany({}, [{ $set: { uid: uid, count: count } }]);
     // });
+    app.get("/myfoods/:uid", async (req, res) => {
+      const uid = req.params.uid;
+      console.log(uid);
+      try {
+        const foods = await restaurent.find({ uid: uid }).toArray();
 
+        res.status(200).send(foods);
+      } catch (error) {
+        res.status(500).send(error);
+      }
+    });
     app.get("/foods/search", async (req, res) => {
       const query = req.query.q;
       try {
