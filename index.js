@@ -32,12 +32,16 @@ async function run() {
     await client.connect();
     // Send a ping to confirm a successful connection
 
-    // app.get("/update", (req, res) => {
-    //   const uid = req.query.uid;
-    //   const count = 0;
-    //   console.log(uid);
-    //   restaurent.updateMany({}, [{ $set: { uid: uid, count: count } }]);
-    // });
+    app.get("/purchase", async (req, res) => {
+      const foodId = req.query.id;
+      const quantity = req.query.quantity;
+      // console.log(foodId, quantity);
+      restaurent.findOneAndUpdate(
+        { _id: new ObjectId(foodId) },
+        { $inc: { quantity: -quantity, count: 1 } }
+      );
+    });
+
     app.get("/myfoods/:uid", async (req, res) => {
       const uid = req.params.uid;
       console.log(uid);
