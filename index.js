@@ -25,6 +25,7 @@ const client = new MongoClient(uri, {
 });
 const database = client.db("restaurent");
 const restaurent = database.collection("all_foods");
+const orders = database.collection("orders");
 
 async function run() {
   try {
@@ -35,12 +36,32 @@ async function run() {
     app.get("/purchase", async (req, res) => {
       const foodId = req.query.id;
       const quantity = req.query.quantity;
-      // console.log(foodId, quantity);
+      const uid = req.query.uid;
+      const date = req.query.date;
+
       restaurent.findOneAndUpdate(
         { _id: new ObjectId(foodId) },
         { $inc: { quantity: -quantity, count: 1 } }
       );
+      const purchaseData = {
+        uid: uid,
+        foodId: foodId,
+        quantity: parseInt(quantity),
+        date: date,
+      };
+
+      try {
+        const sendInfo = await orders.insertOne(purchaseData);
+        res.status(200).send(sendInfo);
+      } catch (error) {
+        res.status(500).send(error);
+      }
     });
+
+    // app.get('/mypurchase/:uid', async (req, res){
+
+    //   const uid = req.params.uid;
+    // })
 
     app.get("/myfoods/:uid", async (req, res) => {
       const uid = req.params.uid;
