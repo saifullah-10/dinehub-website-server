@@ -1,6 +1,6 @@
 const express = require("express");
 const cors = require("cors");
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const cookieParser = require("cookie-parser");
 require("dotenv").config();
 const app = express();
@@ -31,6 +31,29 @@ async function run() {
     // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
     // Send a ping to confirm a successful connection
+
+    app.get("/foods/search", async (req, res) => {
+      const query = req.query.q;
+      try {
+        const foods = await restaurent
+          .find({
+            food_name: { $regex: query, $options: "i" },
+          })
+          .toArray();
+        console.log(foods);
+        res.status(200).send(foods);
+      } catch (err) {
+        res.status(500).send(err);
+      }
+    });
+
+    app.get("/fooddetails/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const food = await restaurent.findOne(query);
+      console.log(food);
+      res.send(food);
+    });
 
     app.get("/homecard", async (req, res) => {
       const elementAmount = req.query.elements;
