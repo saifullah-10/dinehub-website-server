@@ -135,6 +135,17 @@ async function run() {
         .toArray();
       res.send(cursor);
     });
+
+    app.post("/addFood", async (req, res) => {
+      const food = req.body;
+      try {
+        const foodData = await restaurent.insertOne(food);
+        res.status(200).send(foodData);
+      } catch (error) {
+        res.status(500).send(error);
+      }
+    });
+
     app.delete("/deleteorder/:orderId", async (req, res) => {
       const order = req.params.orderId;
 
