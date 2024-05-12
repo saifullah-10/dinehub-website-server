@@ -78,11 +78,15 @@ async function run() {
             if (foods[j]._id == id) {
               foods[j].orderQuantity = orderedFood[i].orderQuantity;
               foods[j].date = orderedFood[i].date;
+
+              foods[j].totalPayable =
+                parseFloat(orderedFood[i].orderQuantity) *
+                parseFloat(foods[j].price);
             }
           }
         }
-
-        res.status(200).send(foods);
+        console.log(foods);
+        // res.status(200).send(foods);
       } catch (e) {
         res.status(500).send(e);
       }
