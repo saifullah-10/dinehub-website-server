@@ -7,7 +7,13 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // middlewares
-app.use(cors());
+app.use(
+  cors({
+    origin: ["https://restaurant-ass-11.web.app", "http://localhost:5173"],
+    credentials: true,
+    // some legacy browsers (IE11, various SmartTVs) choke on 204
+  })
+);
 app.use(express.json());
 app.use(cookieParser());
 
@@ -30,7 +36,7 @@ const orders = database.collection("orders");
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
+    // await client.connect();
     // Send a ping to confirm a successful connection
 
     app.get("/purchase", async (req, res) => {
@@ -63,30 +69,25 @@ async function run() {
       const query = { uid: uid };
       try {
         const orderedFood = await orders.find(query).toArray();
-        const maping = orderedFood.map((foodId) => foodId.foodId);
-        const foodIds = maping.map((id) => new ObjectId(id));
 
-        const foods = await restaurent
-          .find({
-            _id: { $in: foodIds },
-          })
-          .toArray();
-        // using for loop to get more data from different collections
-        for (let i = 0; i < maping.length; i++) {
-          const id = maping[i];
-          for (let j = 0; j < foods.length; j++) {
-            if (foods[j]._id == id) {
-              foods[j].orderQuantity = orderedFood[i].orderQuantity;
-              foods[j].date = orderedFood[i].date;
+        let foods = [];
+        for (const items of orderedFood) {
+          const foodId = new ObjectId(items.foodId);
+          const food = await restaurent.findOne({ _id: foodId });
 
-              foods[j].totalPayable =
-                parseFloat(orderedFood[i].orderQuantity) *
-                parseFloat(foods[j].price);
-            }
+          if (food) {
+            food.orderQuantity = items.orderQuantity;
+            food.date = items.date;
+            food.orderId = items._id;
+            food.totalPayable =
+              parseFloat(items.orderQuantity) * parseFloat(food.price);
+            foods.push(food);
+          } else {
+            console.log(`Food with ID ${foodId} not found.`);
           }
         }
-        console.log(foods);
-        // res.status(200).send(foods);
+
+        res.status(200).send(foods);
       } catch (e) {
         res.status(500).send(e);
       }
@@ -134,11 +135,21 @@ async function run() {
         .toArray();
       res.send(cursor);
     });
+    app.delete("/deleteorder/:orderId", async (req, res) => {
+      const order = req.params.orderId;
 
-    await client.db("admin").command({ ping: 1 });
-    console.log(
-      "Pinged your deployment. You successfully connected to MongoDB!"
-    );
+      const query = { _id: new ObjectId(order) };
+      try {
+        const deleteOrder = await orders.deleteOne(query);
+        res.status(200).send(deleteOrder);
+      } catch (error) {
+        res.status(500).send(error);
+      }
+    });
+    // await client.db("admin").command({ ping: 1 });
+    // console.log(
+    //   "Pinged your deployment. You successfully connected to MongoDB!"
+    // );
   } finally {
     // Ensures that the client will close when you finish/error
     // await client.close();
