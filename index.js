@@ -58,14 +58,28 @@ async function run() {
       }
     });
 
-    // app.get('/mypurchase/:uid', async (req, res){
+    app.get("/mypurchase/:uid", async (req, res) => {
+      const uid = req.params.uid;
+      const query = { uid: uid };
+      try {
+        const orderedFood = await orders.find(query).toArray();
+        const maping = orderedFood.map((foodId) => foodId.foodId);
+        const foodIds = maping.map((id) => new ObjectId(id));
 
-    //   const uid = req.params.uid;
-    // })
+        const foods = await restaurent
+          .find({
+            _id: { $in: foodIds },
+          })
+          .toArray();
+        res.status(200).send(foods);
+      } catch (e) {
+        res.status(500).send(e);
+      }
+    });
 
     app.get("/myfoods/:uid", async (req, res) => {
       const uid = req.params.uid;
-      console.log(uid);
+
       try {
         const foods = await restaurent.find({ uid: uid }).toArray();
 
@@ -82,7 +96,7 @@ async function run() {
             food_name: { $regex: query, $options: "i" },
           })
           .toArray();
-        console.log(foods);
+
         res.status(200).send(foods);
       } catch (err) {
         res.status(500).send(err);
@@ -93,7 +107,7 @@ async function run() {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const food = await restaurent.findOne(query);
-      console.log(food);
+
       res.send(food);
     });
 
