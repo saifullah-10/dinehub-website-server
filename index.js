@@ -46,7 +46,7 @@ async function run() {
       const purchaseData = {
         uid: uid,
         foodId: foodId,
-        quantity: parseInt(quantity),
+        orderQuantity: parseInt(quantity),
         date: date,
       };
 
@@ -71,6 +71,17 @@ async function run() {
             _id: { $in: foodIds },
           })
           .toArray();
+        // using for loop to get more data from different collections
+        for (let i = 0; i < maping.length; i++) {
+          const id = maping[i];
+          for (let j = 0; j < foods.length; j++) {
+            if (foods[j]._id == id) {
+              foods[j].orderQuantity = orderedFood[i].orderQuantity;
+              foods[j].date = orderedFood[i].date;
+            }
+          }
+        }
+
         res.status(200).send(foods);
       } catch (e) {
         res.status(500).send(e);
