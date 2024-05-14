@@ -1,21 +1,46 @@
 const express = require("express");
 const cors = require("cors");
+const jwt = require("jsonwebtoken");
+
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const cookieParser = require("cookie-parser");
 require("dotenv").config();
 const app = express();
 const PORT = process.env.PORT || 3000;
+const cookieOptions = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+};
+//localhost:5000 and localhost:5173 are treated as same site.  so sameSite value must be strict in development server.  in production sameSite will be none
+// in development server secure will false .  in production secure will be true
 
 // middlewares
 app.use(
   cors({
-    origin: ["https://restaurant-ass-11.web.app", "http://localhost:5173"],
+    origin: [
+      "http://localhost:5173",
+      "https://cardoctor-bd.web.app",
+      "https://cardoctor-bd.firebaseapp.com",
+    ],
     credentials: true,
-    // some legacy browsers (IE11, various SmartTVs) choke on 204
   })
 );
 app.use(express.json());
 app.use(cookieParser());
+const verifyToken = async (req, res, next) => {
+  try {
+    const token = req.cookies.token;
+    if (!token) {
+      return res.status(401).send({ status: "unauthorized" });
+    }
+    const verified = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = verified;
+    next();
+  } catch (error) {
+    res.status(401).send({ status: "unauthorized" });
+  }
+};
 
 // mongoDB
 
@@ -32,6 +57,7 @@ const client = new MongoClient(uri, {
 const database = client.db("restaurent");
 const restaurent = database.collection("all_foods");
 const orders = database.collection("orders");
+const feedback = database.collection("feedback_gallery");
 
 async function run() {
   try {
@@ -39,9 +65,24 @@ async function run() {
     // await client.connect();
     // Send a ping to confirm a successful connection
 
+    // jwt section
+    app.post("/jwt", async (req, res) => {
+      const uid = req.body;
+      console.log(uid);
+      const token = jwt.sign(uid, process.env.JWT_SECRET, { expiresIn: "1h" });
+      res
+        .status(200)
+        .cookie("token", token, cookieOptions)
+        .send({ status: "success" });
+      // const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      // res.status(200).send(decoded);
+    });
+    // jwt section
+
     app.get("/purchase", async (req, res) => {
       const foodId = req.query.id;
       const quantity = req.query.quantity;
+
       const uid = req.query.uid;
       const date = req.query.date;
 
@@ -64,8 +105,9 @@ async function run() {
       }
     });
 
-    app.get("/mypurchase/:uid", async (req, res) => {
+    app.get("/mypurchase/:uid", verifyToken, async (req, res) => {
       const uid = req.params.uid;
+
       const query = { uid: uid };
       try {
         const orderedFood = await orders.find(query).toArray();
@@ -79,8 +121,9 @@ async function run() {
             food.orderQuantity = items.orderQuantity;
             food.date = items.date;
             food.orderId = items._id;
-            food.totalPayable =
+            const payable =
               parseFloat(items.orderQuantity) * parseFloat(food.price);
+            food.totalPayable = payable.toFixed(2);
             foods.push(food);
           } else {
             console.log(`Food with ID ${foodId} not found.`);
@@ -93,11 +136,14 @@ async function run() {
       }
     });
 
-    app.get("/myfoods/:uid", async (req, res) => {
+    app.get("/myfoods/:uid", verifyToken, async (req, res) => {
       const uid = req.params.uid;
 
       try {
-        const foods = await restaurent.find({ uid: uid }).toArray();
+        const foods = await restaurent
+          .find({ uid: uid })
+          .sort({ $natural: -1 })
+          .toArray();
 
         res.status(200).send(foods);
       } catch (error) {
@@ -127,13 +173,63 @@ async function run() {
       res.send(food);
     });
 
+    app.get("/allfoods", async (req, res) => {
+      const cursor = await restaurent.find().sort({ $natural: -1 }).toArray();
+      res.send(cursor);
+    });
+
     app.get("/homecard", async (req, res) => {
       const elementAmount = req.query.elements;
       const cursor = await restaurent
-        .find()
-        .limit(parseInt(elementAmount))
+        .aggregate([
+          { $sort: { count: -1 } },
+          { $limit: parseInt(elementAmount) },
+        ])
         .toArray();
+
       res.send(cursor);
+    });
+
+    app.get("/feedbackdata", async (req, res) => {
+      try {
+        const cursor = await feedback.find().sort({ $natural: -1 }).toArray();
+        res.send(cursor);
+      } catch (e) {
+        res.status(500).send(e);
+      }
+    });
+
+    app.post("/logout", async (req, res) => {
+      const user = req.body;
+      console.log("logging out", user);
+      res
+        .clearCookie("token", { ...cookieOptions, maxAge: 0 })
+        .send({ success: true });
+    });
+
+    app.post("/feedback", async (req, res) => {
+      const feedbackData = req.body;
+      try {
+        const sendInfo = await feedback.insertOne(feedbackData);
+        res.status(200).send(sendInfo);
+      } catch (error) {
+        res.status(500).send(error);
+      }
+    });
+
+    app.post("/updatefoods/:id", async (req, res) => {
+      const id = req.params.id;
+      const food = req.body;
+      console.log(id, food);
+      const query = { _id: new ObjectId(id) };
+
+      try {
+        const foodData = await restaurent.updateOne(query, { $set: food });
+
+        res.status(200).send(foodData);
+      } catch (error) {
+        res.status(500).send(error);
+      }
     });
 
     app.post("/addFood", async (req, res) => {
@@ -145,7 +241,16 @@ async function run() {
         res.status(500).send(error);
       }
     });
-
+    app.post("/deleteaddfood/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      try {
+        const foodData = await restaurent.deleteOne(query);
+        res.status(200).send(foodData);
+      } catch (error) {
+        res.status(500).send(error);
+      }
+    });
     app.delete("/deleteorder/:orderId", async (req, res) => {
       const order = req.params.orderId;
 
