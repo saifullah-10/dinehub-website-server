@@ -68,7 +68,7 @@ async function run() {
     // jwt section
     app.post("/jwt", async (req, res) => {
       const uid = req.body;
-      console.log(uid);
+
       const token = jwt.sign(uid, process.env.JWT_SECRET, { expiresIn: "1h" });
       res
         .status(200)
@@ -173,9 +173,31 @@ async function run() {
       res.send(food);
     });
 
+    app.get("/totalDataCount", async (req, res) => {
+      try {
+        const count = await restaurent.countDocuments();
+        res.send({ count: count });
+      } catch (error) {
+        res.status(500).send({ message: error.message });
+      }
+    });
+
     app.get("/allfoods", async (req, res) => {
-      const cursor = await restaurent.find().sort({ $natural: -1 }).toArray();
-      res.send(cursor);
+      const page = parseInt(req.query.page) || 1;
+      const limit = 9;
+      const skip = (page - 1) * limit;
+
+      try {
+        const cursor = await restaurent
+          .find()
+          .skip(skip)
+          .limit(limit)
+          .sort({ $natural: -1 })
+          .toArray();
+        res.send(cursor);
+      } catch (err) {
+        res.status(500).send({ message: err.message });
+      }
     });
 
     app.get("/homecard", async (req, res) => {
@@ -220,7 +242,7 @@ async function run() {
     app.post("/updatefoods/:id", async (req, res) => {
       const id = req.params.id;
       const food = req.body;
-      console.log(id, food);
+
       const query = { _id: new ObjectId(id) };
 
       try {
